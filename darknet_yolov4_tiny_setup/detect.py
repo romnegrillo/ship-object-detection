@@ -42,8 +42,9 @@ def run_detector():
     output_layers = [layer_names[i-1] for i in yolo.getUnconnectedOutLayers()]
     color_red = (0, 0, 255)
 
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     ctr = 0
+    target_iteration = 100
 
     while True:
 
@@ -93,11 +94,11 @@ def run_detector():
 
         # Only upload the image if:
         # There are ship detected.
-        # Every 100 iteration of ctr only.
-        if num_ships > 0 and ctr >= 100:
+        # Every target_iteration iteration of ctr only.
+        if num_ships > 0 and ctr >= target_iteration:
             upload_image(img, num_ships)
 
-        if ctr >= 100:
+        if ctr >= target_iteration:
             ctr = 0
         ctr += 1
 
