@@ -1,0 +1,20 @@
+1.) 
+During training, set batch and subdivision to 64.
+Training command:
+- darknet.exe detector train data/obj.data cfg/yolov4-custom.cfg yolov4.conv.137 -map
+
+2.) 
+The training saves the weight every 1000 epochs. If the training is interrupted, you can resume the training again by specifying the last weight saved by the command:
+- darknet.exe detector train data/obj.data cfg/yolov4-custom.cfg ../training/yolov4-custom_last.weights -map
+
+3.) 
+When testing, you set the batch and subdivision to 1.
+
+For testing image run the command:
+- darknet.exe detector test data/obj.data cfg/yolov4-custom.cfg ../training/yolov4-custom_best.weights blackpink.jpg
+
+For testing in the web cam:
+- darknet.exe detector demo data/obj.data cfg/yolov4-custom.cfg ../training/yolov4-custom_best.weights
+
+Using darknet_video.py
+- python darknet_video.py --weights ../training/yolov4-custom_best.weights --config_file cfg/yolov4-custom.cfg --data_file data/obj.data
