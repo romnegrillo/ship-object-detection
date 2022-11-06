@@ -5,6 +5,7 @@ import configparser
 import boto3
 from botocore.config import Config
 
+
 config = configparser.RawConfigParser()
 config.read("config.ini")
 
@@ -18,14 +19,16 @@ s3 = boto3.client('s3',
                   aws_secret_access_key=AWS_SECRET_ACCESS,
                   config=config)
 
+
 def upload_image(img, num_ships):
     cv2.imwrite("./detected_ship/test.png", img)
 
     # detected_ships/10-30-2022-10-30-AM-5.png
-    upload_filename =f"detected_ships/{datetime.datetime.now().strftime('%m-%d-%Y-%I-%M-%p')}-{num_ships}.png"
+    upload_filename = f"detected_ships/{datetime.datetime.now().strftime('%m-%d-%Y-%I-%M-%p')}-{num_ships}.png"
 
     s3.upload_file("./detected_ship/test.png",
-               BUCKET_NAME, upload_filename)
+                   BUCKET_NAME, upload_filename)
+
 
 def run_detector():
     classes = None

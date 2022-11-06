@@ -7,26 +7,26 @@ from typing import List, Union
 import threading
 import time
 import configparser
+import serial
+from serial.tools import list_ports
 
 config = configparser.RawConfigParser()
 config.read("config.ini")
 
 
 class ShipRecords:
-    _AWS_ACCESS_KEY = config["General"]["AWS_ACCESS_KEY"]
-    _AWS_SECRET_ACCESS = config["General"]["AWS_SECRET_ACCESS"]
-    _BUCKET_NAME = config["General"]["BUCKET_NAME"]
-
-    def __init__(self) -> None:
+    def __init__(self, AWS_CREDENTIALS) -> None:
         self.config = Config(connect_timeout=3600, read_timeout=3600)
+        self.AWS_CREDENTIALS = AWS_CREDENTIALS
         self.s3 = boto3.client('s3',
-                               aws_access_key_id=ShipRecords._AWS_ACCESS_KEY,
-                               aws_secret_access_key=ShipRecords._AWS_SECRET_ACCESS,
+                               aws_access_key_id=self.AWS_CREDENTIALS["AWS_ACCESS_KEY"],
+                               aws_secret_access_key=self.AWS_CREDENTIALS[
+                                   "AWS_SECRET_ACCESS"],
                                config=self.config)
 
     def get_sorted_image(self):
         response = self.s3.list_objects(
-            Bucket=ShipRecords._BUCKET_NAME)
+            Bucket=self.AWS_CREDENTIALS["BUCKET_NAME"])
 
         image_dict = {}
         for content in response.get('Contents', []):
@@ -51,7 +51,7 @@ class ShipRecords:
             time_detected = filename[11:19]
             num_ships = filename[20:]
 
-            self.s3.download_file(ShipRecords._BUCKET_NAME, latest_image_name_s3_path,
+            self.s3.download_file(self.AWS_CREDENTIALS["BUCKET_NAME"], latest_image_name_s3_path,
                                   "./current_image/current_image.png")
 
             return ("./current_image/current_image.png", date_detected, time_detected, num_ships)
@@ -76,7 +76,7 @@ class ShipRecords:
         num_ships = filename[20:]
 
         try:
-            self.s3.download_file(ShipRecords._BUCKET_NAME, image_s3_path,
+            self.s3.download_file(self.AWS_CREDENTIALS["BUCKET_NAME"], image_s3_path,
                                   "./current_image/selected_image.png")
 
             return ("./current_image/selected_image.png", date_detected, time_detected, num_ships)
@@ -91,32 +91,63 @@ class StartWindow(QtWidgets.QMainWindow):
         super(StartWindow, self).__init__()
         loadUi("startwindow.ui", self)
         self.init_widgets()
+        self.list_serial_ports()
+        self.aws_credentials = None
 
     def init_widgets(self):
         self.start_button.clicked.connect(self.start_button_clicked)
         self.exit_button.clicked.connect(self.exit_button_clicked)
+        # self.node_mcu_port
 
     def start_button_clicked(self) -> None:
-        self.w = RecentLogWindow()
-        self.w.show()
-        self.close()
+        if self.connect_node_mcu():
+            self.w = RecentLogWindow(self.aws_credentials)
+            self.w.show()
+            self.close()
+
+    def list_serial_ports(self):
+        self.selected_port = None
+        serial_ports = [i.device for i in list_ports.comports()]
+        self.node_mcu_port.addItems(serial_ports)
+
+        return serial_ports
+
+    def connect_node_mcu(self):
+        if len(self.list_serial_ports()) > 0:
+            selected_port = str(self.node_mcu_port.currentText())
+            self.selected_port = serial.Serial(selected_port, 115200)
+
+            data = self.selected_port.readline(
+            ).decode("utf-8").split(",")
+
+            self.aws_credentials = {
+                "AWS_ACCESS_KEY": data[0].strip(),
+                "AWS_SECRET_ACCESS": data[1].strip(),
+                "BUCKET_NAME": data[2].strip()
+            }
+
+            return True
 
     def exit_button_clicked(self) -> None:
         self.close()
 
     def closeEvent(self, event):
+        if self.selected_port is not None or self.selected_port.isOpen():
+            self.selected_port.close()
+
         event.accept()
 
 
 class RecentLogWindow(QtWidgets.QMainWindow):
     _IMAGE_REFRESH_INTERVAL = 5
 
-    def __init__(self) -> None:
+    def __init__(self, aws_credentials) -> None:
         super(RecentLogWindow, self).__init__()
         loadUi("recentlogwindow.ui", self)
-        self.init_widgets()
 
-        self.ship_records = ShipRecords()
+        self.aws_credentials = aws_credentials
+        self.init_widgets()
+        self.ship_records = ShipRecords(self.aws_credentials)
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.display_recent_image)
@@ -138,7 +169,7 @@ class RecentLogWindow(QtWidgets.QMainWindow):
                 pass
 
     def view_log_button_clicked(self) -> None:
-        self.w = PastLogWindow()
+        self.w = PastLogWindow(self.aws_credentials)
         self.w.show()
         self.stop_timer()
         self.close()
@@ -161,12 +192,13 @@ class RecentLogWindow(QtWidgets.QMainWindow):
 class PastLogWindow(QtWidgets.QMainWindow):
     _IMAGE_REFRESH_INTERVAL = 5
 
-    def __init__(self) -> None:
+    def __init__(self, aws_credentials) -> None:
         super(PastLogWindow, self).__init__()
         loadUi("pastlogwindow.ui", self)
-        self.init_widgets()
 
-        self.ship_records = ShipRecords()
+        self.aws_credentials = aws_credentials
+        self.init_widgets()
+        self.ship_records = ShipRecords(self.aws_credentials)
 
         self.thread = threading.Thread(target=self.update_image_list)
         self.thread.start()
@@ -185,7 +217,6 @@ class PastLogWindow(QtWidgets.QMainWindow):
     def update_image_list(self):
         while True:
             ship_image_list = self.ship_records.get_image_list()
-            print(len(ship_image_list))
 
             if self.prev_image_len != len(ship_image_list):
                 self.image_list_widget.clear()
@@ -209,7 +240,7 @@ class PastLogWindow(QtWidgets.QMainWindow):
             self.num_ship_label.setText(f"No. Ships Detected: {num_ships}")
 
     def back_button_clicked(self):
-        self.w = RecentLogWindow()
+        self.w = RecentLogWindow(self.aws_credentials)
         self.w.show()
         self.stop_thread = True
         self.close()
