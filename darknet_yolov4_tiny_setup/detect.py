@@ -77,9 +77,10 @@ def run_detector():
                     boxes.append([x, y, w, h])
                     confidences.append(float(confidence))
                     class_ids.append(class_id)
-                    num_ships += 1
+                    
 
         indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.1, 0.1)
+        num_ships = len(indices)
 
         for i in range(len(boxes)):
             if i in indices:
