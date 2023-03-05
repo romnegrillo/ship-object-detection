@@ -1,6 +1,6 @@
-# Research Project - Ship Detection System for Naval Environment using YOLOv4 Algorithm
+# Ship Object Detaction
 
-Deep learning and IoT-based project for detection and monitoring of ships.
+Computer vision project from Mapua to detect ship in a harbor ported in Raspberry Pi connected to AWS and have desktop application for monitoring.
 
 The folder `darknet_yolov4_tiny_setup` contains the setup files needed for training and running the darknet YOLOv4 Tiny object detection and uploading the detected images in the cloud. This folder contains the setup files to be merged in the actual darknet setup only, not the whole darknet setup.
 
